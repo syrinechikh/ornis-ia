@@ -1,0 +1,8 @@
+streamlit
+groq
+google-genai
+requests
+Pillow
+birdnetlib
+soundfile
+librosa
