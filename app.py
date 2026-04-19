@@ -1,461 +1,277 @@
 import streamlit as st
 from groq import Groq
-import base64, tempfile, os, uuid
+import base64, tempfile, os, uuid, json
 from datetime import datetime
+import streamlit.components.v1 as components
  
-st.set_page_config(
-    page_title="Ornis IA",
-    page_icon="🦅",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+st.set_page_config(page_title="Ornis IA", page_icon="🦅", layout="wide", initial_sidebar_state="expanded")
  
-# ═══════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════
 #  CSS
-# ═══════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Cormorant+Garamond:wght@300;400;600&family=Tajawal:wght@300;400;700&display=swap');
  
-html, body, .stApp { background: #04080f !important; }
+html,body,.stApp{background:#04080f!important;}
  
-/* ── SPACE BACKGROUND ── */
-.stApp::before {
-    content: '';
-    position: fixed; inset: 0; z-index: 0; pointer-events: none;
-    background:
-        radial-gradient(ellipse at 20% 50%, rgba(40,10,80,.55) 0%, transparent 55%),
-        radial-gradient(ellipse at 80% 20%, rgba(10,30,80,.45) 0%, transparent 55%),
-        radial-gradient(ellipse at 55% 85%, rgba(50,10,5,.3) 0%, transparent 50%);
-}
+/* SPACE */
+.stApp::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:radial-gradient(ellipse at 20% 50%,rgba(40,10,80,.5) 0%,transparent 55%),
+  radial-gradient(ellipse at 80% 20%,rgba(10,30,80,.4) 0%,transparent 55%);}
  
-/* stars via pseudo — use a div instead */
-.stars-wrap { position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden; }
-.stars-wrap span {
-    position:absolute; border-radius:50%; background:#fff;
-    animation: twk 4s ease-in-out infinite alternate;
-}
-@keyframes twk { 0%{opacity:.3} 50%{opacity:1} 100%{opacity:.4} }
+.star{position:fixed;border-radius:50%;background:#fff;pointer-events:none;z-index:0;
+  animation:tw 4s ease-in-out infinite alternate;}
+@keyframes tw{0%{opacity:.2}50%{opacity:.9}100%{opacity:.3}}
  
-/* ── SIDEBAR ── */
-section[data-testid="stSidebar"] {
-    background: #070c1a !important;
-    border-right: 1px solid rgba(212,175,55,.13) !important;
-    width: 270px !important;
-}
-section[data-testid="stSidebar"] > div { padding: 0 !important; }
+/* SIDEBAR */
+[data-testid="stSidebar"]{background:#060c1c!important;border-right:1px solid rgba(212,175,55,.12)!important;}
+[data-testid="stSidebar"]>div{padding:0!important;}
  
-.sb-header {
-    padding: 20px 16px 12px;
-    border-bottom: 1px solid rgba(212,175,55,.1);
-}
-.sb-logo {
-    font-family: 'Playfair Display', serif;
-    font-size: 20px; font-weight: 900; letter-spacing: 5px;
-    background: linear-gradient(135deg, #ffd700, #d4af37, #8b6914);
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-    background-clip: text; display: block; margin-bottom: 2px;
-}
-.sb-tagline {
-    font-size: 9px; color: rgba(212,175,55,.38);
-    letter-spacing: 3px; font-family: 'Cormorant Garamond', serif;
-    text-transform: uppercase;
-}
+.sb-logo{font-family:'Playfair Display',serif;font-size:19px;font-weight:900;letter-spacing:5px;
+  background:linear-gradient(135deg,#ffd700,#d4af37,#8b6914);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.sb-sub{font-size:9px;color:rgba(212,175,55,.35);letter-spacing:3px;font-family:'Cormorant Garamond',serif;}
+.sb-div{height:1px;background:rgba(212,175,55,.1);margin:8px 0;}
+.sb-lbl{font-size:9px;color:rgba(212,175,55,.38);letter-spacing:2px;text-transform:uppercase;padding:8px 4px 3px;}
  
-.sb-new-btn {
-    display: flex; align-items: center; gap: 8px;
-    margin: 12px 10px 4px;
-    padding: 9px 14px;
-    background: rgba(212,175,55,.07);
-    border: 1px solid rgba(212,175,55,.22);
-    border-radius: 8px; color: #d4af37;
-    font-size: 13px; cursor: pointer; transition: all .2s;
-}
-.sb-new-btn:hover { background: rgba(212,175,55,.14); border-color: rgba(212,175,55,.4); }
+.ch-row{padding:8px 10px;border-radius:7px;margin:2px 0;cursor:pointer;
+  color:#9a8060;font-size:12px;border:1px solid transparent;transition:all .18s;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:'Tajawal',sans-serif;}
+.ch-row:hover{background:rgba(212,175,55,.07);color:#d4af37;border-color:rgba(212,175,55,.15);}
+.ch-row.on{background:rgba(212,175,55,.11);color:#ffd700;border-color:rgba(212,175,55,.26);}
+.ch-date{font-size:9px;color:rgba(212,175,55,.25);padding:0 10px;margin-bottom:3px;}
  
-.sb-search {
-    margin: 6px 10px;
-    padding: 7px 12px;
-    background: rgba(255,255,255,.04);
-    border: 1px solid rgba(212,175,55,.12);
-    border-radius: 8px; color: rgba(255,255,255,.5);
-    font-size: 12px; display: flex; align-items: center; gap: 6px;
-}
+/* MAIN */
+.block-container{padding:0!important;max-width:820px;}
+section[data-testid="stMain"]>div{position:relative;z-index:10;}
  
-.sb-section-label {
-    padding: 12px 16px 4px;
-    font-size: 10px; color: rgba(212,175,55,.4);
-    letter-spacing: 2px; text-transform: uppercase;
-}
+/* LANDING */
+.land{position:relative;z-index:10;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;min-height:88vh;padding:50px 24px;text-align:center;}
+.b-em{font-size:80px;animation:fl 5s ease-in-out infinite,gl 3s ease-in-out infinite alternate;margin-bottom:20px;}
+@keyframes fl{0%,100%{transform:translateY(0)}50%{transform:translateY(-15px)}}
+@keyframes gl{0%{filter:drop-shadow(0 0 14px rgba(212,175,55,.5))}100%{filter:drop-shadow(0 0 40px rgba(255,215,0,.9))}}
+.brand{font-family:'Playfair Display',serif;font-size:clamp(50px,9vw,96px);font-weight:900;letter-spacing:12px;
+  background:linear-gradient(180deg,#fffbe6 0%,#ffd700 15%,#d4af37 35%,#8b6914 50%,#d4af37 65%,#ffd700 80%,#c8960c 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  filter:drop-shadow(0 2px 26px rgba(212,175,55,.5));animation:bin 1.8s cubic-bezier(.23,1.01,.32,1) both;}
+@keyframes bin{0%{opacity:0;transform:scale(.65) translateY(38px)}70%{opacity:1;transform:scale(1.04) translateY(-4px)}100%{opacity:1;transform:scale(1) translateY(0)}}
+.bsub{font-family:'Cormorant Garamond',serif;letter-spacing:10px;font-size:clamp(10px,1.5vw,13px);
+  color:rgba(212,175,55,.58);margin-top:3px;animation:fi 1s ease-out 1.5s both;}
+.ghr{width:240px;height:1px;background:linear-gradient(90deg,transparent,#d4af37,transparent);margin:18px auto;animation:fi 1s ease-out 2s both;}
+.tgl{color:rgba(255,255,255,.6);font-size:clamp(13px,1.7vw,16px);line-height:1.85;max-width:520px;animation:fi 1s ease-out 2.2s both;}
+@keyframes fi{0%{opacity:0;transform:translateY(14px)}100%{opacity:1;transform:translateY(0)}}
+.pills{display:flex;gap:9px;flex-wrap:wrap;justify-content:center;margin:22px 0;animation:fi 1s ease-out 2.5s both;}
+.pl{background:rgba(212,175,55,.07);border:1px solid rgba(212,175,55,.28);border-radius:40px;padding:7px 18px;color:#d4af37;font-size:12px;}
  
-.chat-row {
-    display: flex; align-items: center; gap: 8px;
-    padding: 9px 14px; margin: 1px 6px;
-    border-radius: 8px; cursor: pointer;
-    color: #9a8060; font-size: 12px; font-family: 'Tajawal', sans-serif;
-    border: 1px solid transparent;
-    transition: all .18s;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.chat-row:hover { background: rgba(212,175,55,.07); color: #d4af37; border-color: rgba(212,175,55,.14); }
-.chat-row.active { background: rgba(212,175,55,.12); color: #ffd700; border-color: rgba(212,175,55,.28); }
-.chat-row-date { font-size: 10px; color: rgba(212,175,55,.28); padding: 0 14px; margin-bottom: 2px; }
+/* CHAT HDR */
+.chdr{text-align:center;padding:16px 0 5px;border-bottom:1px solid rgba(212,175,55,.1);margin-bottom:10px;position:relative;z-index:10;}
+.clogo{font-family:'Playfair Display',serif;font-size:clamp(20px,3.5vw,36px);font-weight:900;letter-spacing:7px;
+  background:linear-gradient(180deg,#ffd700,#d4af37,#8b6914);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.csub{font-family:'Cormorant Garamond',serif;color:rgba(212,175,55,.38);letter-spacing:4px;font-size:9px;}
  
-.sb-divider { height: 1px; background: rgba(212,175,55,.1); margin: 8px 0; }
+/* BUBBLES */
+.bu{background:linear-gradient(135deg,rgba(212,175,55,.12),rgba(212,175,55,.05));
+  border:1px solid rgba(212,175,55,.26);border-radius:16px 16px 4px 16px;
+  padding:13px 17px;margin:7px 0;color:#fde68a;font-family:'Tajawal',sans-serif;font-size:15px;
+  position:relative;z-index:10;}
+.bb{background:rgba(5,10,26,.93);border:1px solid rgba(212,175,55,.12);
+  border-radius:16px 16px 16px 4px;padding:17px 20px;margin:7px 0;
+  color:#e3e0d8;font-family:'Tajawal',sans-serif;font-size:15px;line-height:1.9;
+  position:relative;z-index:10;backdrop-filter:blur(8px);}
+.src{display:inline-flex;align-items:center;gap:4px;margin-top:9px;
+  background:rgba(212,175,55,.06);border:1px solid rgba(212,175,55,.16);
+  border-radius:20px;padding:3px 13px;font-size:10px;color:#9a7030;}
  
-.sb-sources {
-    padding: 4px 16px;
-    font-size: 10px; color: #555; line-height: 2.1;
-}
+/* CARD */
+.card{position:relative;z-index:10;background:rgba(5,10,26,.88);
+  border:1px solid rgba(212,175,55,.16);border-radius:12px;padding:18px;
+  margin-bottom:12px;backdrop-filter:blur(7px);}
+.ctitle{font-family:'Playfair Display',serif;color:#d4af37;font-size:16px;letter-spacing:2px;margin-bottom:10px;}
  
-/* ── MAIN CONTENT ── */
-.block-container { padding: 0 !important; max-width: 860px; position: relative; z-index: 10; }
-section[data-testid="stMain"] > div { position: relative; z-index: 10; }
+.div{height:1px;background:linear-gradient(90deg,transparent,rgba(212,175,55,.22),transparent);margin:10px 0;position:relative;z-index:10;}
  
-/* ── LANDING ── */
-.landing {
-    position: relative; z-index: 10;
-    display: flex; flex-direction: column; align-items: center;
-    justify-content: center; min-height: 88vh;
-    padding: 50px 24px 40px; text-align: center;
-}
-.bird-em {
-    font-size: 85px; line-height: 1;
-    animation: float 5s ease-in-out infinite, glow 3s ease-in-out infinite alternate;
-    margin-bottom: 22px;
-}
-@keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-16px)} }
-@keyframes glow {
-    0%  { filter: drop-shadow(0 0 14px rgba(212,175,55,.5)); }
-    100%{ filter: drop-shadow(0 0 42px rgba(255,215,0,.9)); }
-}
-.brand {
-    font-family: 'Playfair Display', serif;
-    font-size: clamp(52px,9vw,100px); font-weight: 900; letter-spacing: 12px;
-    background: linear-gradient(180deg,#fffbe6 0%,#ffd700 15%,#d4af37 35%,#8b6914 50%,#d4af37 65%,#ffd700 80%,#c8960c 100%);
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
-    filter: drop-shadow(0 2px 28px rgba(212,175,55,.5));
-    animation: brand-in 1.8s cubic-bezier(.23,1.01,.32,1) both;
-}
-@keyframes brand-in {
-    0%  { opacity:0; transform:scale(.6) translateY(40px); }
-    70% { opacity:1; transform:scale(1.04) translateY(-5px); }
-    100%{ opacity:1; transform:scale(1) translateY(0); }
-}
-.brand-sub {
-    font-family: 'Cormorant Garamond', serif; letter-spacing: 11px;
-    font-size: clamp(10px,1.5vw,14px); color: rgba(212,175,55,.6); margin-top: 4px;
-    animation: fin 1s ease-out 1.5s both;
-}
-.gold-hr {
-    width: 260px; height: 1px;
-    background: linear-gradient(90deg,transparent,#d4af37,transparent);
-    margin: 20px auto; animation: fin 1s ease-out 2s both;
-}
-.tagline {
-    color: rgba(255,255,255,.62); font-size: clamp(13px,1.8vw,17px);
-    line-height: 1.85; max-width: 540px; animation: fin 1s ease-out 2.2s both;
-}
-@keyframes fin { 0%{opacity:0;transform:translateY(16px)} 100%{opacity:1;transform:translateY(0)} }
-.pills {
-    display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;
-    margin: 24px 0; animation: fin 1s ease-out 2.5s both;
-}
-.pill {
-    background: rgba(212,175,55,.07); border: 1px solid rgba(212,175,55,.3);
-    border-radius: 40px; padding: 8px 20px; color: #d4af37; font-size: 13px;
-}
+/* INPUT BAR */
+.input-bar{position:relative;z-index:10;display:flex;align-items:center;gap:8px;
+  padding:10px;background:rgba(5,10,26,.9);border:1px solid rgba(212,175,55,.18);
+  border-radius:14px;margin-top:6px;}
  
-/* ── CHAT HEADER ── */
-.chat-hdr {
-    position: relative; z-index: 10; text-align: center;
-    padding: 18px 0 6px; margin-bottom: 10px;
-    border-bottom: 1px solid rgba(212,175,55,.1);
-}
-.chat-logo {
-    font-family: 'Playfair Display', serif;
-    font-size: clamp(22px,4vw,38px); font-weight: 900; letter-spacing: 7px;
-    background: linear-gradient(180deg,#ffd700,#d4af37,#8b6914);
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
-}
-.chat-sub { font-family:'Cormorant Garamond',serif; color:rgba(212,175,55,.4); letter-spacing:4px; font-size:10px; }
+/* STREAMLIT */
+.stButton>button{background:linear-gradient(135deg,#4a3500,#c49b20,#ffd700)!important;
+  color:#050200!important;border:none!important;border-radius:28px!important;
+  padding:10px 32px!important;font-family:'Playfair Display',serif!important;
+  font-weight:700!important;font-size:13px!important;letter-spacing:1.5px!important;
+  box-shadow:0 0 16px rgba(212,175,55,.2)!important;transition:all .3s!important;}
+.stButton>button:hover{transform:scale(1.04)!important;box-shadow:0 0 28px rgba(212,175,55,.45)!important;}
  
-/* ── BUBBLES ── */
-.bu {
-    background: linear-gradient(135deg,rgba(212,175,55,.12),rgba(212,175,55,.05));
-    border: 1px solid rgba(212,175,55,.28); border-radius: 16px 16px 4px 16px;
-    padding: 14px 18px; margin: 8px 0; color: #fde68a;
-    font-family: 'Tajawal', sans-serif; font-size: 15px;
-    position: relative; z-index: 10;
-}
-.bb {
-    background: rgba(6,11,28,.92); border: 1px solid rgba(212,175,55,.13);
-    border-radius: 16px 16px 16px 4px; padding: 18px 22px; margin: 8px 0;
-    color: #e4e1d9; font-family: 'Tajawal', sans-serif; font-size: 15px; line-height: 1.9;
-    position: relative; z-index: 10; backdrop-filter: blur(10px);
-}
-.src {
-    display: inline-flex; align-items: center; gap: 5px; margin-top: 10px;
-    background: rgba(212,175,55,.06); border: 1px solid rgba(212,175,55,.18);
-    border-radius: 20px; padding: 3px 14px; font-size: 11px; color: #a07c30;
-}
+[data-testid="stFileUploader"]{background:rgba(212,175,55,.03)!important;
+  border:1.5px dashed rgba(212,175,55,.3)!important;border-radius:10px!important;}
+[data-testid="stFileUploader"] label{color:#d4af37!important;}
+[data-testid="stFileUploadDropzone"]{background:transparent!important;border:none!important;}
+[data-testid="stFileUploadDropzone"] p{color:#7a6040!important;}
+[data-testid="stFileUploadDropzone"] svg{fill:#d4af37!important;}
  
-/* ── CARDS ── */
-.card {
-    position: relative; z-index: 10;
-    background: rgba(6,11,28,.85); border: 1px solid rgba(212,175,55,.18);
-    border-radius: 14px; padding: 22px; margin-bottom: 14px;
-    backdrop-filter: blur(8px);
-}
-.card-title { font-family:'Playfair Display',serif; color:#d4af37; font-size:17px; letter-spacing:3px; margin-bottom:12px; }
-.step-tag {
-    display: inline-block; background: rgba(212,175,55,.1); border: 1px solid rgba(212,175,55,.28);
-    border-radius: 20px; padding: 3px 14px; color: #d4af37; font-size: 11px;
-    letter-spacing: 2px; margin-bottom: 10px;
-}
+div[data-testid="stAudioInput"]{background:rgba(212,175,55,.03)!important;
+  border:1.5px dashed rgba(212,175,55,.38)!important;border-radius:10px!important;}
  
-/* ── DIVIDER ── */
-.div { height:1px; background:linear-gradient(90deg,transparent,rgba(212,175,55,.25),transparent); margin:12px 0; position:relative; z-index:10; }
- 
-/* ── STREAMLIT OVERRIDES ── */
-.stButton > button {
-    background: linear-gradient(135deg,#5a4000,#d4af37,#ffd700) !important;
-    color: #060300 !important; border: none !important; border-radius: 30px !important;
-    padding: 11px 36px !important; font-family: 'Playfair Display',serif !important;
-    font-weight: 700 !important; font-size: 13px !important; letter-spacing: 2px !important;
-    box-shadow: 0 0 18px rgba(212,175,55,.22) !important; transition: all .3s !important;
-}
-.stButton > button:hover { transform:scale(1.04) !important; box-shadow:0 0 32px rgba(212,175,55,.5) !important; }
- 
-[data-testid="stFileUploader"] {
-    background: rgba(212,175,55,.03) !important;
-    border: 1.5px dashed rgba(212,175,55,.32) !important; border-radius: 10px !important;
-}
-[data-testid="stFileUploader"] label { color: #d4af37 !important; }
-[data-testid="stFileUploadDropzone"] { background: transparent !important; border: none !important; }
-[data-testid="stFileUploadDropzone"] p { color: #8a7050 !important; }
-[data-testid="stFileUploadDropzone"] svg { fill: #d4af37 !important; }
- 
-div[data-testid="stAudioInput"] {
-    background: rgba(212,175,55,.03) !important;
-    border: 1.5px dashed rgba(212,175,55,.4) !important; border-radius: 10px !important;
-}
-.stChatInput textarea {
-    background: rgba(6,11,30,.95) !important; border: 1px solid rgba(212,175,55,.26) !important;
-    color: #fde68a !important; border-radius: 12px !important;
-}
-.stNumberInput input {
-    background: rgba(6,11,30,.9) !important; border: 1px solid rgba(212,175,55,.26) !important;
-    color: #fde68a !important; border-radius: 8px !important;
-}
-label, .stRadio label, .stSelectbox label { color: #d4af37 !important; }
-.stTextInput input {
-    background: rgba(6,11,30,.9) !important; border: 1px solid rgba(212,175,55,.26) !important;
-    color: #fde68a !important; border-radius: 8px !important;
-}
- 
-#MainMenu, footer, header { visibility: hidden; }
+.stChatInput textarea{background:rgba(5,10,28,.96)!important;
+  border:1px solid rgba(212,175,55,.24)!important;color:#fde68a!important;border-radius:12px!important;}
+.stTextInput input{background:rgba(5,10,28,.9)!important;
+  border:1px solid rgba(212,175,55,.22)!important;color:#fde68a!important;border-radius:7px!important;}
+label,.stRadio label,.stSelectbox label{color:#d4af37!important;}
+#MainMenu,footer,header{visibility:hidden;}
 </style>
  
-<!-- starfield -->
-<div class="stars-wrap">
-  <span style="width:2px;height:2px;top:8%;left:12%;animation-delay:0s;opacity:.8"></span>
-  <span style="width:1px;height:1px;top:15%;left:35%;animation-delay:.5s"></span>
-  <span style="width:2px;height:2px;top:5%;left:60%;animation-delay:1s;opacity:.9"></span>
-  <span style="width:1px;height:1px;top:22%;left:80%;animation-delay:1.5s"></span>
-  <span style="width:1.5px;height:1.5px;top:40%;left:5%;animation-delay:.3s;opacity:.7"></span>
-  <span style="width:2px;height:2px;top:50%;left:25%;animation-delay:.8s"></span>
-  <span style="width:1px;height:1px;top:60%;left:45%;animation-delay:1.2s;opacity:.6"></span>
-  <span style="width:2px;height:2px;top:35%;left:70%;animation-delay:.6s;opacity:.9"></span>
-  <span style="width:1px;height:1px;top:70%;left:88%;animation-delay:1.8s"></span>
-  <span style="width:1.5px;height:1.5px;top:80%;left:15%;animation-delay:.4s;opacity:.7"></span>
-  <span style="width:1px;height:1px;top:85%;left:55%;animation-delay:.9s;opacity:.8"></span>
-  <span style="width:2px;height:2px;top:90%;left:75%;animation-delay:1.4s"></span>
-  <span style="width:1px;height:1px;top:28%;left:48%;animation-delay:.2s;opacity:.5;background:rgba(255,220,150,.9)"></span>
-  <span style="width:1.5px;height:1.5px;top:45%;left:92%;animation-delay:1s;opacity:.7;background:rgba(180,200,255,.8)"></span>
-  <span style="width:1px;height:1px;top:65%;left:30%;animation-delay:.7s"></span>
-  <span style="width:2px;height:2px;top:12%;left:90%;animation-delay:1.6s;opacity:.6"></span>
-</div>
+<!-- Stars -->
+<script>
+const s=[{t:'8%',l:'12%',sz:'2px',d:'0s'},{t:'5%',l:'62%',sz:'1.5px',d:'.5s'},{t:'22%',l:'80%',sz:'1px',d:'1s'},
+{t:'40%',l:'5%',sz:'1.5px',d:'.3s'},{t:'35%',l:'70%',sz:'2px',d:'.7s'},{t:'55%',l:'28%',sz:'1px',d:'1.2s'},
+{t:'70%',l:'50%',sz:'1.5px',d:'.9s'},{t:'80%',l:'15%',sz:'2px',d:'.4s'},{t:'85%',l:'75%',sz:'1px',d:'1.5s'},
+{t:'14%',l:'45%',sz:'1px',d:'.6s'},{t:'60%',l:'90%',sz:'1.5px',d:'1.1s'},{t:'92%',l:'38%',sz:'2px',d:'.8s'}];
+document.addEventListener('DOMContentLoaded',()=>{s.forEach(x=>{const e=document.createElement('div');
+e.className='star';e.style.cssText=`top:${x.t};left:${x.l};width:${x.sz};height:${x.sz};animation-delay:${x.d}`;
+document.body.appendChild(e);});});
+</script>
 """, unsafe_allow_html=True)
  
-# ═══════════════════════════════════════════════════════════
-#  CLIENT & MODELS
-# ═══════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════
+#  CLIENT
+# ═══════════════════════════════════════════════════════════════
 client       = Groq(api_key=st.secrets["GROQ_API_KEY"])
 CHAT_MODEL   = "llama-3.3-70b-versatile"
 VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
  
-# ═══════════════════════════════════════════════════════════
-#  PROMPTS
-# ═══════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════
+#  PROFESSOR PROMPTS
+# ═══════════════════════════════════════════════════════════════
 SYS = {
-"العربية": """أنت البروفيسور Ornis — عالم أورنيثولوجيا من الدرجة الأولى، حاصل على الدكتوراه من Cornell University، ومساهم في Handbook of the Birds of the World وBirdLife International. لديك 30+ عاماً من البحث الميداني.
+"العربية": """أنت البروفيسور Ornis — عالم أورنيثولوجيا (علم الطيور) من الدرجة الأولى.
+حاصل على الدكتوراه من Cornell University. مساهم في Handbook of the Birds of the World وBirdLife International. خبرة ميدانية تجاوزت 30 عاماً في 6 قارات.
  
-أسلوبك: علمي دقيق، واضح، وعميق مثل David Attenborough الأكاديمي. تبدأ بالنقطة الأكثر إثارة، وتربط المعلومات ببعضها، وتذكر تفاصيل دقيقة لا يعرفها إلا المتخصصون.
+**قواعد الأسلوب الأكاديمي:**
+- تجيب بعقل العالم المتخصص وقلب المعلّم الشغوف
+- كل سؤال له إجابة بمستوى عمقه: سؤال بسيط = إجابة وافية واضحة / سؤال عميق = تحليل أكاديمي معمّق
+- ابدأ دائماً بأكثر نقطة علمية إثارة واهتماماً
+- اذكر الاسم العلمي اللاتيني عند ذكر أي نوع
+- اربط المعلومات ببعضها وابنِ السياق البيولوجي والبيئي
+- اذكر تفاصيل لا يعرفها إلا المتخصصون
  
-هيكل كل إجابة (إلزامي):
+**هيكل الإجابة عند السؤال عن نوع طائر:**
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🦅 **[الاسم العربي]** | *[Genus species]*
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-**📌 التصنيف الفيلوجيني:**
-Chordata | الرتبة: ... | العائلة: ... | الجنس: ... | النوع: ...
-اشتقاق الاسم العلمي: [معنى الكلمات اللاتينية]
- 
-**🌍 الانتشار الجغرافي والهجرة:**
-[خريطة وصفية دقيقة، مسارات هجرة، توزيع موسمي]
- 
-**🏔️ البيئة الإيكولوجية:**
-[نوع الموطن الدقيق، ارتفاع، مناخ، علاقات تكافلية]
- 
-**🎨 الوصف المورفولوجي:**
-[قياسات، وزن، ألوان دقيقة، فروق ذكر/أنثى/صغار، سمات تشخيصية فارقة]
- 
-**🔊 الصوت والتواصل:**
-[وصف الأصوات، دورها، موسميتها، مقارنة بأنواع مشابهة]
- 
-**🍃 الغذاء وسلوكيات الصيد:**
-[الفريسة بالتفصيل، تقنيات الصيد، الموقع في السلسلة الغذائية]
- 
-**🥚 التكاثر وعلم الأعشاش:**
-[موسم التكاثر، بناء العش، عدد البيض، الحضانة، الرعاية الأبوية]
- 
-**🔬 ملاحظات علمية متخصصة:**
-[أبحاث حديثة، تكيفات تطورية، حقائق للمتخصصين فقط]
- 
-**⚠️ الحالة الحفاظية (IUCN):**
-[التصنيف الدقيق، اتجاه الأعداد، التهديدات، جهود الحماية]
+**📌 التصنيف:** الرتبة | العائلة | الجنس | النوع
+**🌍 الانتشار والهجرة:** ...
+**🏔️ البيئة الإيكولوجية:** ...
+**🎨 المورفولوجيا:** ...
+**🔊 الأصوات:** ...
+**🍃 الغذاء والسلوك:** ...
+**🥚 التكاثر:** ...
+**🔬 ملاحظات متخصصة:** ...
+**⚠️ IUCN:** ...
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-**📚 المراجع:** Cornell Lab · eBird · BirdLife International · HBW Alive · IUCN Red List · Xeno-canto
+**📚 المراجع:** Cornell Lab · eBird · BirdLife · HBW · IUCN · Xeno-canto
  
-❌ محظور تماماً: Wikipedia أو أي مصدر غير علمي محكّم""",
+**للأسئلة العامة:** أجب بشكل منظم وعلمي دون استخدام الهيكل الكامل إذا لم يكن ضرورياً.
+❌ لا تستخدم Wikipedia أو مصادر غير علمية.""",
  
-"English": """You are Professor Ornis — a world-renowned ornithologist, PhD from Cornell University, contributor to Handbook of the Birds of the World and BirdLife International, with 30+ years of field research across 6 continents.
+"English": """You are Professor Ornis — a world-class ornithologist.
+PhD from Cornell University. Contributor to HBW and BirdLife International. 30+ years of field research across 6 continents.
  
-Style: Write with the precision of a scientific paper and the captivating clarity of David Attenborough. Lead with the most fascinating aspect. Include specialist-level details unknown to non-experts.
+**Academic Style Rules:**
+- Answer with a specialist's mind and passionate teacher's voice
+- Depth matches the question: simple question = clear answer / deep question = full academic analysis
+- Always start with the most scientifically fascinating point
+- Always include Latin scientific names
+- Include specialist-level details unknown to non-experts
  
-Mandatory structure for every answer:
+**Species Answer Structure:**
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🦅 **[Common Name]** | *[Genus species]*
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-**📌 Phylogenetic Classification:**
-Chordata | Order: ... | Family: ... | Genus: ... | Species: ...
-Etymology: [meaning of the Latin/Greek words]
- 
-**🌍 Geographic Distribution & Migration:**
-[Precise range, migration routes, seasonal distribution]
- 
-**🏔️ Ecological Habitat & Niche:**
-[Specific habitat, altitude, climate, symbiotic relationships]
- 
-**🎨 Morphological & Diagnostic Description:**
-[Measurements, mass, precise plumage, sexual dimorphism, juvenile plumage, distinguishing marks from similar species]
- 
-**🔊 Vocalizations & Communication:**
-[Detailed sound description, ecological role, seasonality]
- 
-**🍃 Foraging Ecology & Diet:**
-[Precise prey, hunting techniques, trophic position]
- 
-**🥚 Breeding Biology & Nest Ecology:**
-[Breeding season, nest construction, clutch size, incubation, parental care]
- 
-**🔬 Specialist Scientific Notes:**
-[Recent peer-reviewed research, evolutionary adaptations, specialist-only facts]
- 
-**⚠️ Conservation Status & Threats:**
-[Precise IUCN category, population trend, threats, conservation efforts]
+**📌 Taxonomy:** Order | Family | Genus | Species
+**🌍 Distribution & Migration:** ...
+**🏔️ Ecological Habitat:** ...
+**🎨 Morphology:** ...
+**🔊 Vocalizations:** ...
+**🍃 Diet & Behavior:** ...
+**🥚 Breeding Biology:** ...
+**🔬 Specialist Notes:** ...
+**⚠️ IUCN Status:** ...
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-**📚 References:** Cornell Lab · eBird · BirdLife International · HBW Alive · IUCN Red List · Xeno-canto
+**📚 References:** Cornell Lab · eBird · BirdLife · HBW · IUCN · Xeno-canto
  
-❌ NEVER cite: Wikipedia, general websites, blogs, non-peer-reviewed sources""",
+**For general questions:** Answer in a structured, scientific way without the full template if not needed.
+❌ NEVER cite Wikipedia or non-scientific sources.""",
  
-"Français": """Vous êtes le Professeur Ornis — ornithologue de renommée mondiale, docteur de Cornell University, contributeur au HBW et BirdLife International, 30+ ans de recherche de terrain.
+"Français": """Vous êtes le Professeur Ornis — ornithologue de classe mondiale.
+Docteur de Cornell University. Contributeur au HBW et BirdLife International. 30+ ans de terrain sur 6 continents.
  
-Style: Précision scientifique avec la clarté captivante de David Attenborough. Commencez par l'aspect le plus fascinant.
+**Style académique:**
+- Répondez avec la rigueur d'un spécialiste et la passion d'un enseignant
+- Profondeur adaptée à la question
+- Nom scientifique latin toujours inclus
+- Détails que seuls les spécialistes connaissent
  
-Structure obligatoire:
+**Structure pour une espèce:**
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🦅 **[Nom commun]** | *[Genre espèce]*
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-**📌 Classification phylogénétique:**
-Chordata | Ordre: ... | Famille: ... | Genre: ... | Espèce: ...
-Étymologie: [signification des termes latins/grecs]
- 
-**🌍 Répartition & Migration:**
-**🏔️ Habitat & Niche écologique:**
-**🎨 Description morphologique & diagnostique:**
-**🔊 Vocalisations & Communication:**
-**🍃 Écologie alimentaire:**
-**🥚 Biologie de la reproduction:**
-**🔬 Notes scientifiques spécialisées:**
-**⚠️ Statut UICN & Menaces:**
+**📌 Taxonomie · 🌍 Répartition · 🏔️ Habitat · 🎨 Morphologie · 🔊 Vocalisations · 🍃 Alimentation · 🥚 Reproduction · 🔬 Notes spécialisées · ⚠️ UICN**
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-**📚 Références:** Cornell Lab · eBird · BirdLife International · HBW Alive · UICN · Xeno-canto
- 
-❌ JAMAIS: Wikipedia, sites généraux, blogs"""
+**📚 Références:** Cornell Lab · eBird · BirdLife · HBW · UICN · Xeno-canto
+❌ JAMAIS Wikipedia."""
 }
  
 IMG_P = {
-"العربية": """أنت البروفيسور Ornis. حلّل هذه الصورة بعين عالم متخصص:
+"العربية": """أنت البروفيسور Ornis. شاهد هذه الصورة وقدم تشخيصاً ميدانياً متخصصاً:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🔍 **التشخيص الميداني المتخصص**
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🦅 **الاسم العربي:** | ***الاسم العلمي:***
-📌 **التصنيف:** الرتبة ← العائلة ← الجنس
+🦅 **الاسم العربي:** | ***Genus species***
+📌 **التصنيف:** الرتبة | العائلة | الجنس
  
-🎨 **السمات التشخيصية في هذه الصورة تحديداً:**
-صف بدقة: ألوان الريش، شكل المنقار، حجم الجسم، الوضعية، لون العين، نمط الجناح
+🎨 **السمات التشخيصية في هذه الصورة:**
+[صف بدقة: ألوان الريش، شكل المنقار، الحجم، الوضعية، لون العين، نمط الأجنحة]
  
-🔍 **التمييز عن الأنواع المشابهة:**
-لماذا هذا النوع وليس غيره؟
- 
-🌍 **الموطن:** | ⚠️ **IUCN:**
-📚 **المصدر:** Cornell Lab · eBird · BirdLife Int.
+🔍 **التمييز عن الأنواع المشابهة:** [لماذا هذا النوع تحديداً؟]
+🌍 **الموطن:** | ⚠️ **IUCN:** | 📚 **المصدر:** Cornell Lab · eBird · BirdLife
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚠️ **ثقة التشخيص:** [عالية جداً / عالية / متوسطة / منخفضة]
-**السبب:**""",
+⚠️ **ثقة التشخيص:** [عالية جداً/عالية/متوسطة/منخفضة] — **السبب:**""",
  
-"English": """You are Professor Ornis. Analyze this image with specialist ornithologist eyes:
+"English": """You are Professor Ornis. Examine this image with specialist ornithologist eyes:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🔍 **Specialist Field Identification**
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🦅 **Common Name:** | ***Scientific Name:***
-📌 **Taxonomy:** Order → Family → Genus
+🦅 **Common Name:** | ***Genus species***
+📌 **Taxonomy:** Order | Family | Genus
  
-🎨 **Diagnostic features visible in THIS image specifically:**
-Describe precisely: plumage colors, bill morphology, body size, posture, eye color, wing pattern, bare parts
+🎨 **Diagnostic features visible in THIS image:**
+[Describe precisely: plumage, bill morphology, size, posture, eye color, wing pattern]
  
-🔍 **Separation from similar species:**
-Why this species and not look-alikes?
- 
-🌍 **Habitat:** | ⚠️ **IUCN Status:**
-📚 **Source:** Cornell Lab · eBird · BirdLife International
+🔍 **Separation from similar species:** [Why this species specifically?]
+🌍 **Habitat:** | ⚠️ **IUCN:** | 📚 **Source:** Cornell Lab · eBird · BirdLife
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚠️ **ID Confidence:** [Very High / High / Medium / Low]
-**Rationale:**""",
+⚠️ **ID Confidence:** [Very High/High/Medium/Low] — **Rationale:**""",
  
-"Français": """Vous êtes le Professeur Ornis. Analysez cette image en spécialiste:
+"Français": """Vous êtes le Professeur Ornis. Examinez cette image en spécialiste:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🔍 **Identification de terrain spécialisée**
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🦅 **Nom commun:** | ***Nom scientifique:***
-📌 **Taxonomie:** Ordre → Famille → Genre
- 
-🎨 **Caractéristiques diagnostiques dans CETTE image:**
-Décrivez: plumage, bec, taille, posture, œil, ailes
- 
-🔍 **Séparation des espèces similaires:**
- 
-🌍 **Habitat:** | ⚠️ **UICN:**
-📚 **Source:** Cornell Lab · eBird · BirdLife International
+🦅 **Nom commun:** | ***Genre espèce***
+📌 **Taxonomie:** Ordre | Famille | Genre
+🎨 **Caractéristiques diagnostiques:** [Plumage, bec, taille, posture]
+🔍 **Séparation espèces similaires:**
+🌍 **Habitat:** | ⚠️ **UICN:** | 📚 **Source:** Cornell Lab · eBird · BirdLife
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚠️ **Confiance:** [Très élevée / Élevée / Moyenne / Faible]
-**Justification:**"""
+⚠️ **Confiance:** [Très élevée/Élevée/Moyenne/Faible] — **Justification:**"""
 }
  
-# ═══════════════════════════════════════════════════════════
-#  FUNCTIONS
-# ═══════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════
+#  CORE FUNCTIONS
+# ═══════════════════════════════════════════════════════════════
 def chat_groq(msg, lang, history):
     msgs = [{"role":"system","content":SYS[lang]}]
     for h in history[-10:]:
@@ -469,7 +285,7 @@ def analyze_image(img_file, lang):
         img_bytes = img_file.read()
         b64 = base64.b64encode(img_bytes).decode()
         ext = img_file.name.split(".")[-1].lower()
-        mime = "image/png" if ext == "png" else "image/jpeg"
+        mime = "image/png" if ext=="png" else "image/jpeg"
         r = client.chat.completions.create(
             model=VISION_MODEL,
             messages=[{"role":"user","content":[
@@ -482,37 +298,39 @@ def analyze_image(img_file, lang):
     except Exception as e:
         return f"⚠️ Image analysis error: {e}"
  
-def analyze_audio(audio_bytes, lat, lon, lang):
+def transcribe(audio_bytes):
     try:
-        from birdnetlib import Recording
-        from birdnetlib.analyzer import Analyzer
-        analyzer = Analyzer()
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
-            tmp.write(audio_bytes)
-            tmp_path = tmp.name
-        today = datetime.now().strftime("%Y-%m-%d")
-        rec = Recording(analyzer, tmp_path, lat=lat, lon=lon,
-                        date_frmt="%Y-%m-%d", date=today, min_conf=0.18)
-        rec.analyze()
+            tmp.write(audio_bytes); tmp_path = tmp.name
+        with open(tmp_path,"rb") as f:
+            result = client.audio.transcriptions.create(
+                model="whisper-large-v3", file=("audio.wav",f), language="ar"
+            )
         os.unlink(tmp_path)
-        if rec.detections:
-            birds = "\n".join([
-                f"• {d['common_name']} ({d['scientific_name']}) — confidence: {d['confidence']:.0%}"
-                for d in rec.detections[:5]
-            ])
-            prompt = f"BirdNET neural network detected:\n{birds}\n\nAs Professor Ornis, provide a complete academic profile for the most likely species."
-        else:
-            prompt = "BirdNET found no clear detection. As Professor Ornis, advise on optimal recording conditions, technique, and timing for bird sound identification."
-        return chat_groq(prompt, lang, [])
+        return result.text
     except Exception as e:
-        return f"⚠️ Audio error: {e}"
+        return f"[transcription error: {e}]"
  
-# ═══════════════════════════════════════════════════════════
+def tts_js(text, lang):
+    """Inject browser TTS"""
+    voice_lang = {"العربية":"ar","English":"en-US","Français":"fr-FR"}
+    clean = text.replace('"',' ').replace("'", " ").replace("\n"," ")[:500]
+    js = f"""
+    <script>
+    const u = new SpeechSynthesisUtterance("{clean}");
+    u.lang = "{voice_lang.get(lang,'en-US')}";
+    u.rate = 0.92; u.pitch = 1;
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(u);
+    </script>"""
+    components.html(js, height=0)
+ 
+# ═══════════════════════════════════════════════════════════════
 #  SESSION HELPERS
-# ═══════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════
 def save_and_new():
     if st.session_state.messages:
-        title = next((m["content"][:48] for m in st.session_state.messages if m["role"]=="user"), "Session")
+        title = next((m["content"][:50] for m in st.session_state.messages if m["role"]=="user"), "Chat")
         if not any(s["id"]==st.session_state.sid for s in st.session_state.sessions):
             st.session_state.sessions.insert(0,{
                 "id": st.session_state.sid,
@@ -523,7 +341,7 @@ def save_and_new():
     st.session_state.messages = []
     st.session_state.sid = str(uuid.uuid4())[:8]
     st.session_state.active = None
-    st.session_state.location_ok = False
+    st.session_state.show_img = False
  
 def load_sess(sid):
     s = next((x for x in st.session_state.sessions if x["id"]==sid), None)
@@ -532,236 +350,185 @@ def load_sess(sid):
         st.session_state.sid = sid
         st.session_state.active = sid
  
-def filtered_sessions():
-    q = st.session_state.get("search_q","").strip().lower()
-    if not q:
-        return st.session_state.sessions
-    return [s for s in st.session_state.sessions if q in s["title"].lower()]
- 
-# ═══════════════════════════════════════════════════════════
-#  INIT STATE
-# ═══════════════════════════════════════════════════════════
-DEFAULTS = {
-    "page":"landing","messages":[],"lang":"العربية","mode":"chat",
-    "sessions":[],"sid":str(uuid.uuid4())[:8],"active":None,
-    "location_ok":False,"lat":36.7,"lon":3.0,"search_q":""
-}
-for k,v in DEFAULTS.items():
+# ═══════════════════════════════════════════════════════════════
+#  STATE INIT
+# ═══════════════════════════════════════════════════════════════
+D = {"page":"landing","messages":[],"lang":"العربية","sessions":[],
+     "sid":str(uuid.uuid4())[:8],"active":None,"show_img":False,
+     "search_q":"","pending_text":"","speak_last":False}
+for k,v in D.items():
     if k not in st.session_state: st.session_state[k]=v
  
-# ═══════════════════════════════════════════════════════════
-#  LANDING PAGE
-# ═══════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════
+#  LANDING
+# ═══════════════════════════════════════════════════════════════
 if st.session_state.page == "landing":
     st.markdown("""
-    <div class="landing">
-      <div class="bird-em">🦅</div>
+    <div class="land">
+      <div class="b-em">🦅</div>
       <div class="brand">ORNIS</div>
-      <div class="brand-sub">INTELLIGENCE ARTIFICIELLE ORNITHOLOGIQUE</div>
-      <div class="gold-hr"></div>
-      <div class="tagline">
+      <div class="bsub">INTELLIGENCE ARTIFICIELLE ORNITHOLOGIQUE</div>
+      <div class="ghr"></div>
+      <div class="tgl">
         منصة ذكاء اصطناعي أكاديمية — مستوى بروفيسور متخصص<br>
-        تحليل الصور · تسجيل مباشر · معرفة علمية من Cornell & BirdLife<br>
-        <span style="font-size:11px;opacity:.4;font-family:'Cormorant Garamond',serif;letter-spacing:2px">
+        تحليل الصور · أسئلة بالصوت · إجابات علمية موثّقة<br>
+        <span style="font-size:11px;opacity:.38;font-family:'Cormorant Garamond',serif;letter-spacing:2px">
           Cornell Lab · eBird · BirdLife International · IUCN
         </span>
       </div>
       <div class="pills">
-        <div class="pill">🖼️ Vision AI</div>
-        <div class="pill">🎙️ Live Recording</div>
-        <div class="pill">📚 Academic Sources</div>
-        <div class="pill">🌍 Multilingual</div>
-        <div class="pill">🕓 Chat History</div>
+        <div class="pl">🖼️ Bird ID from Photo</div>
+        <div class="pl">🎤 Voice Questions</div>
+        <div class="pl">🔊 Voice Answers</div>
+        <div class="pl">📚 Academic Sources</div>
+        <div class="pl">🕓 Chat History</div>
       </div>
-    </div>
-    """, unsafe_allow_html=True)
-    c1, c2, c3 = st.columns([1,2,1])
+    </div>""", unsafe_allow_html=True)
+    c1,c2,c3 = st.columns([1,2,1])
     with c2:
         lg = st.selectbox("", ["العربية","English","Français"], label_visibility="collapsed")
         st.session_state.lang = lg
         if st.button("✦  Enter Ornis IA  ✦", use_container_width=True):
-            st.session_state.page = "chat"; st.rerun()
+            st.session_state.page="chat"; st.rerun()
  
-# ═══════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════
 #  CHAT PAGE
-# ═══════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════
 else:
     lang = st.session_state.lang
  
-    # ──────────────────────────────────────────────────────
-    #  SIDEBAR — Claude-like
-    # ──────────────────────────────────────────────────────
+    # ── SIDEBAR ──────────────────────────────────────────────
     with st.sidebar:
-        # Logo
-        st.markdown("""
-        <div class="sb-header">
-          <span class="sb-logo">ORNIS IA</span>
-          <span class="sb-tagline">Ornithological Intelligence</span>
+        st.markdown(f"""
+        <div style="padding:18px 14px 10px">
+          <div class="sb-logo">ORNIS IA</div>
+          <div class="sb-sub">Ornithological Intelligence</div>
         </div>""", unsafe_allow_html=True)
  
-        # New Chat
-        if st.button("＋  New Chat", use_container_width=True, key="new_chat_btn"):
+        if st.button("＋  New Chat", use_container_width=True, key="new_btn"):
             save_and_new(); st.rerun()
  
-        st.markdown('<div class="sb-divider"></div>', unsafe_allow_html=True)
+        st.markdown('<div class="sb-div"></div>', unsafe_allow_html=True)
  
         # Language
         lg2 = st.selectbox("🌍 Language", ["العربية","English","Français"],
                            index=["العربية","English","Français"].index(lang), key="lang_sb")
         st.session_state.lang = lg2
  
-        st.markdown('<div class="sb-divider"></div>', unsafe_allow_html=True)
+        st.markdown('<div class="sb-div"></div>', unsafe_allow_html=True)
  
         # Search
-        st.text_input("🔍 Search chats", key="search_q", placeholder="Search conversations...",
-                      label_visibility="collapsed")
+        st.text_input("", key="search_q", placeholder="🔍 Search conversations...", label_visibility="collapsed")
+        q = st.session_state.search_q.strip().lower()
  
-        # History list
-        st.markdown('<div class="sb-section-label">🕓 Chat History</div>', unsafe_allow_html=True)
+        # History
+        st.markdown('<div class="sb-lbl">🕓 Chat History</div>', unsafe_allow_html=True)
+        sess_list = [s for s in st.session_state.sessions if (not q or q in s["title"].lower())]
  
-        sessions_shown = filtered_sessions()
-        if not sessions_shown:
-            st.markdown('<p style="color:rgba(212,175,55,.28);font-size:11px;padding:4px 16px">No chats yet</p>', unsafe_allow_html=True)
-        else:
-            for s in sessions_shown:
-                is_active = (s["id"] == st.session_state.active)
-                cls = "chat-row active" if is_active else "chat-row"
-                st.markdown(f'<div class="{cls}">💬 {s["title"][:34]}...</div><div class="chat-row-date">{s["date"]}</div>', unsafe_allow_html=True)
-                if st.button("↗", key=f"open_{s['id']}"):
-                    load_sess(s["id"]); st.rerun()
+        if not sess_list:
+            st.markdown('<p style="color:rgba(212,175,55,.25);font-size:11px;padding:3px 10px">No history yet</p>', unsafe_allow_html=True)
+        for s in sess_list:
+            is_on = s["id"] == st.session_state.active
+            cls = "ch-row on" if is_on else "ch-row"
+            st.markdown(f'<div class="{cls}">💬 {s["title"][:36]}...</div><div class="ch-date">{s["date"]}</div>', unsafe_allow_html=True)
+            if st.button("Open →", key=f"o_{s['id']}"):
+                load_sess(s["id"]); st.rerun()
  
-        st.markdown('<div class="sb-divider"></div>', unsafe_allow_html=True)
+        st.markdown('<div class="sb-div"></div>', unsafe_allow_html=True)
+        st.markdown('<div class="sb-lbl">📚 Sources</div>', unsafe_allow_html=True)
+        st.markdown("""<div style="padding:3px 10px;font-size:10px;color:#4a3f30;line-height:2.2">
+🔬 Cornell Lab · 🐦 eBird<br>🌍 BirdLife International<br>📖 HBW Alive · 🔴 IUCN<br>🎵 Xeno-canto</div>""",
+unsafe_allow_html=True)
  
-        # Sources
-        st.markdown('<div class="sb-section-label">📚 Sources</div>', unsafe_allow_html=True)
-        st.markdown("""<div class="sb-sources">
-🔬 Cornell Lab of Ornithology<br>
-🐦 eBird Global Database<br>
-🌍 BirdLife International<br>
-📖 HBW Alive<br>🎵 Xeno-canto<br>🔴 IUCN Red List
-</div>""", unsafe_allow_html=True)
- 
-        st.markdown('<div class="sb-divider"></div>', unsafe_allow_html=True)
- 
-        c_clear, c_home = st.columns(2)
-        with c_clear:
-            if st.button("🗑️ Clear", use_container_width=True, key="clr_btn"):
+        st.markdown('<div class="sb-div"></div>', unsafe_allow_html=True)
+        sc1, sc2 = st.columns(2)
+        with sc1:
+            if st.button("🗑️ Clear", use_container_width=True, key="clr"):
                 st.session_state.messages=[]; st.rerun()
-        with c_home:
-            if st.button("🏠 Home", use_container_width=True, key="home_btn"):
+        with sc2:
+            if st.button("🏠 Home", use_container_width=True, key="hm"):
                 save_and_new(); st.session_state.page="landing"; st.rerun()
  
-    # ──────────────────────────────────────────────────────
-    #  MAIN — Header
-    # ──────────────────────────────────────────────────────
+    # ── HEADER ───────────────────────────────────────────────
     st.markdown("""
-    <div class="chat-hdr">
-      <div class="chat-logo">🦅 ORNIS IA</div>
-      <div class="chat-sub">Professor-Level Ornithological Intelligence</div>
+    <div class="chdr">
+      <div class="clogo">🦅 ORNIS IA</div>
+      <div class="csub">Professor-Level Ornithological Intelligence</div>
     </div>""", unsafe_allow_html=True)
  
-    # Mode buttons
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        if st.button("💬  Chat", use_container_width=True, key="mode_chat"):
-            st.session_state.mode="chat"; st.rerun()
-    with c2:
-        if st.button("🖼️  Image", use_container_width=True, key="mode_img"):
-            st.session_state.mode="image"; st.rerun()
-    with c3:
-        if st.button("🎙️  Record", use_container_width=True, key="mode_aud"):
-            st.session_state.mode="audio"; st.rerun()
- 
-    mode_lbl = {"chat":"💬 Chat Mode","image":"🖼️ Image Analysis","audio":"🎙️ Live Recording"}
-    st.markdown(f'<p style="text-align:center;color:rgba(212,175,55,.45);font-size:11px;letter-spacing:2px;margin:5px 0 8px">{mode_lbl[st.session_state.mode]}</p>', unsafe_allow_html=True)
-    st.markdown('<div class="div"></div>', unsafe_allow_html=True)
- 
-    # Messages
-    for m in st.session_state.messages:
+    # ── MESSAGES ─────────────────────────────────────────────
+    for i, m in enumerate(st.session_state.messages):
         if m["role"] == "user":
             st.markdown(f'<div class="bu">👤 {m["content"]}</div>', unsafe_allow_html=True)
         else:
             st.markdown(f'<div class="bb">🦅 {m["content"]}<br><span class="src">📚 Cornell Lab · eBird · BirdLife · IUCN</span></div>', unsafe_allow_html=True)
  
+    # TTS for last bot message
+    if st.session_state.get("speak_last") and st.session_state.messages:
+        last_bot = next((m["content"] for m in reversed(st.session_state.messages) if m["role"]=="model"), None)
+        if last_bot:
+            tts_js(last_bot, lang)
+        st.session_state.speak_last = False
+ 
     st.markdown('<div class="div"></div>', unsafe_allow_html=True)
  
-    # ──────────────────────────────────────────────────────
-    #  IMAGE MODE
-    # ──────────────────────────────────────────────────────
-    if st.session_state.mode == "image":
-        st.markdown('<div class="card"><div class="card-title">🖼️ &nbsp; Bird Image Analysis</div>', unsafe_allow_html=True)
-        img = st.file_uploader("Upload a clear bird photo", type=["jpg","jpeg","png","webp"], key="img_up")
+    # ── IMAGE UPLOAD PANEL (toggle) ──────────────────────────
+    if st.session_state.show_img:
+        st.markdown('<div class="card"><div class="ctitle">🖼️ &nbsp; Bird Photo Analysis</div>', unsafe_allow_html=True)
+        img = st.file_uploader("Upload bird photo", type=["jpg","jpeg","png","webp"], key="img_up")
         if img:
-            ci, _ = st.columns([1,2])
+            ci,_ = st.columns([1,2])
             with ci: st.image(img, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
         if img and st.button("🔍  Identify Species", use_container_width=True, key="id_img"):
-            with st.spinner("🔭 Professor Ornis is analyzing..."):
+            with st.spinner("🔭 Professor Ornis analyzing..."):
                 res = analyze_image(img, lang)
-                st.session_state.messages.append({"role":"user","content":"📸 [Bird image uploaded]"})
+                st.session_state.messages.append({"role":"user","content":"📸 [Bird photo submitted for identification]"})
                 st.session_state.messages.append({"role":"model","content":res})
+                st.session_state.show_img = False
                 st.rerun()
  
-    # ──────────────────────────────────────────────────────
-    #  AUDIO MODE
-    # ──────────────────────────────────────────────────────
-    elif st.session_state.mode == "audio":
- 
-        if not st.session_state.location_ok:
-            # STEP 1
-            st.markdown('<div class="card"><div class="step-tag">STEP 1 / 2</div><div class="card-title">📍 Confirm Location</div>', unsafe_allow_html=True)
-            st.markdown('<p style="color:rgba(255,255,255,.48);font-size:13px;margin-bottom:12px">BirdNET uses GPS coordinates to narrow species detection — like Merlin Bird ID.</p>', unsafe_allow_html=True)
-            defaults = {"العربية":(36.7,3.0),"English":(37.09,-95.71),"Français":(46.23,2.21)}
-            lat_d, lon_d = defaults[lang]
-            cl, cn = st.columns(2)
-            with cl: lat_v = st.number_input("📍 Latitude",  value=lat_d, format="%.4f")
-            with cn: lon_v = st.number_input("📍 Longitude", value=lon_d, format="%.4f")
-            st.markdown('<p style="color:rgba(212,175,55,.32);font-size:11px;margin-top:6px">💡 Get coords: <a href="https://maps.google.com" target="_blank" style="color:#d4af37">maps.google.com</a> → right-click → "What\'s here?"</p>', unsafe_allow_html=True)
-            st.markdown('</div>', unsafe_allow_html=True)
-            if st.button("📍  Confirm & Continue →", use_container_width=True, key="confirm_loc"):
-                st.session_state.lat = lat_v
-                st.session_state.lon = lon_v
-                st.session_state.location_ok = True
+    # ── VOICE INPUT PANEL ────────────────────────────────────
+    with st.expander("🎤 Record your question", expanded=False):
+        st.markdown('<p style="color:rgba(212,175,55,.5);font-size:12px">Record your question — it will be transcribed automatically.</p>', unsafe_allow_html=True)
+        aud = st.audio_input("🎤 Hold to record", key="voice_in")
+        if aud and st.button("📝  Transcribe & Send", use_container_width=True, key="transcribe_btn"):
+            with st.spinner("🎙️ Transcribing..."):
+                ab = aud.read() if hasattr(aud,"read") else bytes(aud)
+                text = transcribe(ab)
+            if text and not text.startswith("[transcription"):
+                st.session_state.messages.append({"role":"user","content":f"🎤 {text}"})
+                with st.spinner("🤔 Professor Ornis is thinking..."):
+                    rep = chat_groq(text, lang, st.session_state.messages[:-1])
+                st.session_state.messages.append({"role":"model","content":rep})
                 st.rerun()
+            else:
+                st.warning("Could not transcribe. Please try again.")
  
-        else:
-            # Location bar
-            loc_col, chg_col = st.columns([5,1])
-            with loc_col:
-                st.markdown(f'<p style="color:rgba(212,175,55,.5);font-size:12px;padding-top:4px">📍 {st.session_state.lat:.3f}°, {st.session_state.lon:.3f}°</p>', unsafe_allow_html=True)
-            with chg_col:
-                if st.button("✏️", key="chg_loc"):
-                    st.session_state.location_ok = False; st.rerun()
+    # ── BOTTOM INPUT BAR ─────────────────────────────────────
+    bar_c1, bar_c2, bar_c3 = st.columns([1, 10, 1])
  
-            # STEP 2
-            st.markdown('<div class="card"><div class="step-tag">STEP 2 / 2</div><div class="card-title">🎙️ Record Bird Sound</div>', unsafe_allow_html=True)
-            st.markdown('<p style="color:rgba(255,255,255,.45);font-size:13px;margin-bottom:12px">Hold still · Point toward the bird · Record ≥ 10 seconds for best results.</p>', unsafe_allow_html=True)
-            aud = st.audio_input("🎙️ Tap to record", key="audio_rec")
-            if aud:
-                st.success("✅ Recording ready — press Analyze below.")
-            st.markdown('</div>', unsafe_allow_html=True)
- 
-            if aud and st.button("🎧  Analyze with BirdNET", use_container_width=True, key="analyze_aud"):
-                with st.spinner("🔊 BirdNET analyzing · Professor Ornis preparing report..."):
-                    ab = aud.read() if hasattr(aud, "read") else bytes(aud)
-                    res = analyze_audio(ab, st.session_state.lat, st.session_state.lon, lang)
-                    st.session_state.messages.append({"role":"user","content":"🎙️ [Live bird recording]"})
-                    st.session_state.messages.append({"role":"model","content":res})
-                    st.rerun()
- 
-    # ──────────────────────────────────────────────────────
-    #  CHAT MODE
-    # ──────────────────────────────────────────────────────
-    else:
-        ph = {
-            "العربية": "💬 اسأل البروفيسور Ornis عن أي طائر...",
-            "English": "💬 Ask Professor Ornis about any bird...",
-            "Français": "💬 Posez une question au Professeur Ornis..."
-        }
-        ui = st.chat_input(ph[lang])
-        if ui:
-            st.session_state.messages.append({"role":"user","content":ui})
-            with st.spinner("🤔 Consulting ornithological literature..."):
-                rep = chat_groq(ui, lang, st.session_state.messages[:-1])
-            st.session_state.messages.append({"role":"model","content":rep})
+    with bar_c1:
+        # + button to toggle image upload
+        if st.button("➕", key="plus_btn", help="Attach bird photo"):
+            st.session_state.show_img = not st.session_state.show_img
             st.rerun()
+ 
+    with bar_c2:
+        ph = {"العربية":"💬 اسأل البروفيسور Ornis عن أي طائر...",
+              "English":"💬 Ask Professor Ornis about any bird...",
+              "Français":"💬 Posez une question au Professeur Ornis..."}
+        user_input = st.chat_input(ph[lang])
+ 
+    with bar_c3:
+        if st.button("🔊", key="tts_btn", help="Read last answer aloud"):
+            st.session_state.speak_last = True
+            st.rerun()
+ 
+    # Process chat input
+    if user_input:
+        st.session_state.messages.append({"role":"user","content":user_input})
+        with st.spinner("🤔 Consulting ornithological literature..."):
+            rep = chat_groq(user_input, lang, st.session_state.messages[:-1])
+        st.session_state.messages.append({"role":"model","content":rep})
+        st.rerun()
