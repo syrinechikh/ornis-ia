@@ -3,6 +3,19 @@ from groq import Groq
 import base64, tempfile, os, uuid
 from datetime import datetime
 import streamlit.components.v1 as components
+import re
+
+def md_to_html(text):
+    """Convert markdown to HTML for proper rendering in divs"""
+    # Bold
+    text = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', text)
+    # Italic
+    text = re.sub(r'\*(.*?)\*', r'<i>\1</i>', text)
+    # Headers lines (━━━)
+    text = text.replace('━', '─')
+    # Line breaks
+    text = text.replace('\n', '<br>')
+    return text
 
 st.set_page_config(
     page_title="Ornis IA",
@@ -637,10 +650,11 @@ Condor · Emu · PubMed · Gill 2020
             st.markdown(f'<div class="bu">👤 {m["content"]}</div>', unsafe_allow_html=True)
         else:
             st.markdown(
-                f'<div class="bb">🦅 {m["content"]}'
-                f'<div class="src-footer">📚 Cornell Lab · eBird · BirdLife · HBW · IUCN · The Auk · Ibis · Xeno-canto · PubMed</div></div>',
-                unsafe_allow_html=True
-            )
+    f'<div class="bb">🦅 {md_to_html(m["content"])}'
+    f'<br><span class="src-footer">📚 Cornell Lab · eBird · BirdLife · IUCN</span></div>',
+    unsafe_allow_html=True
+)
+
 
     if st.session_state.speak_it:
         last = next((m["content"] for m in reversed(st.session_state.messages) if m["role"]=="model"), None)
