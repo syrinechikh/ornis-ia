@@ -702,19 +702,19 @@ Condor · Emu · PubMed · Gill 2020
             st.rerun()
 
     if user_input:
-    st.session_state.messages.append({"role":"user","content":user_input})
+        st.session_state.messages.append({"role":"user","content":user_input})
 
-    if not is_bird_question(user_input):
-        refusal = {
-            "العربية": "🦅 Ornis IA مخصص حصراً لعلم الطيور. سؤالك خارج نطاق تخصصي. أرجو طرح سؤال يتعلق بالطيور.",
-            "English": "🦅 Ornis IA is exclusively dedicated to ornithology. Your question is outside my scope. Please ask about birds.",
-            "Français": "🦅 Ornis IA est exclusivement dédié à l'ornithologie. Votre question dépasse mon domaine. Veuillez poser une question sur les oiseaux."
-        }
-        st.session_state.messages.append({"role":"model","content":refusal[lang]})
-    else:
-        with st.spinner("🤔 Consulting ornithological literature..."):
-            rep = chat_groq(user_input, lang)
-        st.session_state.messages.append({"role":"model","content":rep})
+        if not is_bird_question(user_input):
+            refusal = {
+                "العربية": "🦅 Ornis IA مخصص حصراً لعلم الطيور. سؤالك خارج نطاق تخصصي. أرجو طرح سؤال يتعلق بالطيور.",
+                "English": "🦅 Ornis IA is exclusively dedicated to ornithology. Your question is outside my scope. Please ask about birds.",
+                "Français": "🦅 Ornis IA est exclusivement dédié à l'ornithologie. Votre question dépasse mon domaine. Veuillez poser une question sur les oiseaux."
+            }
+            st.session_state.messages.append({"role":"model","content":refusal[lang]})
+        else:
+            with st.spinner("🤔 Consulting ornithological literature..."):
+                rep = chat_groq(user_input, lang)
+            st.session_state.messages.append({"role":"model","content":rep})
 
-    save_current()
-    st.rerun()
+        save_current()
+        st.rerun()
