@@ -270,7 +270,6 @@ SYS = {
 
 مصادر معتمدة: Cornell Lab · eBird · BirdLife · Avibase · Macaulay Library · Birds of the World · IUCN · Xeno-canto · BHL · SORA · The Auk · Ibis · Journal of Ornithology · The Condor · Emu · Current Ornithology · PubMed · HBW Alive · Frank Gill (2020) · ResearchGate
 ❌ محظور: Wikipedia، مواقع عامة، مدونات""",
-"\n\n🚫 قاعدة مطلقة غير قابلة للكسر: إذا كان السؤال لا يتعلق بعلم الطيور (أورنيثولوجيا)، بيولوجيا الطيور، تصنيفها، سلوكها، موائلها، هجرتها، أصواتها، تكاثرها، أو حفاظها — ترفض الإجابة بالكامل وتقول فقط: '🦅 Ornis IA مخصص حصراً لعلم الطيور. سؤالك خارج نطاق تخصصي. أرجو طرح سؤال يتعلق بالطيور.' لا تضيف أي شرح إضافي."
 
 "English": """You are Professor Ornis — ornithologist PhD Cornell University, HBW & BirdLife contributor, 30+ years field research.
 
@@ -287,7 +286,6 @@ Structure for species:
 
 Sources: Cornell Lab · eBird · BirdLife · Avibase · Macaulay Library · Birds of the World · IUCN · Xeno-canto · BHL · SORA · The Auk · Ibis · J.Ornithology · The Condor · Emu · Current Ornithology · PubMed · HBW · Gill (2020) · ResearchGate
 ❌ NEVER: Wikipedia, blogs, general sites""",
-"\n\n🚫 Absolute non-negotiable rule: if the question is not related to ornithology, avian biology, bird taxonomy, behavior, habitat, migration, vocalizations, reproduction, or conservation — refuse entirely and respond only: '🦅 Ornis IA is exclusively dedicated to ornithology. Your question is outside my area of specialization. Please ask a bird-related question.' Do not add any further explanation."
 "Français": """Vous êtes le Professeur Ornis — PhD Cornell, contributeur HBW & BirdLife, 30+ ans de terrain.
 
 RÈGLE CITATION: Après CHAQUE fait, source immédiate: *(Cornell Lab, 2024)* ou *(Gill, 2020)* etc.
@@ -303,7 +301,6 @@ Structure espèce:
 
 Sources: Cornell Lab · eBird · BirdLife · Avibase · Macaulay · Birds of the World · UICN · Xeno-canto · BHL · SORA · The Auk · Ibis · J.Ornithology · The Condor · Emu · PubMed · HBW · Gill (2020) · ResearchGate
 ❌ JAMAIS Wikipedia"""
-"\n\n🚫 Règle absolue non négociable : si la question ne concerne pas l'ornithologie, la biologie aviaire, la taxonomie, le comportement, l'habitat, la migration, les vocalisations, la reproduction ou la conservation des oiseaux — refusez entièrement et répondez uniquement : '🦅 Ornis IA est exclusivement dédié à l'ornithologie. Votre question dépasse mon domaine de spécialisation. Veuillez poser une question sur les oiseaux.' N'ajoutez aucune explication supplémentaire."
 }
 
 IMG_P = {
@@ -410,6 +407,32 @@ def delete_session(sid):
         st.session_state.messages = []
         st.session_state.cur_sid  = str(uuid.uuid4())[:8]
 
+BIRD_KEYWORDS = [
+    # عربي
+    "طائر","طيور","أجنحة","ريش","منقار","عش","بيض","هجرة","تغريد","صقر","نسر",
+    "بومة","حمام","ببغاء","وطواط","تصنيف","أورنيثولوجيا","أورنيثولوجي",
+    # français
+    "oiseau","oiseaux","ornithologie","ornithologique","aile","plume","bec","nid",
+    "migration","rapace","faucon","aigle","hibou","moineau","espèce","aviaire",
+    "avifaune","taxon","taxonomie","famille","genre","ordre","passereau",
+    "canard","cigogne","perroquet","vautour","ibis","flamant","grue",
+    # english
+    "bird","birds","ornithology","ornithological","wing","feather","beak","nest",
+    "migration","raptor","falcon","eagle","owl","sparrow","species","avian",
+    "avifauna","taxonomy","plumage","warbler","duck","stork","parrot","vulture",
+    "heron","flamingo","crane","swift","swallow","robin","finch",
+    # scientific
+    "aves","passeriformes","accipitriformes","falconiformes","strigiformes",
+    "anseriformes","charadriiformes","columbiformes","psittaciformes",
+    "ciconia","falco","aquila","corvus","passer","turdus","larus","ardea",
+    # sources
+    "ebird","cornell","birdlife","xeno-canto","hbw","iucn","merlin",
+    "macaulay","avibase","birdnet"
+]
+
+def is_bird_question(text: str) -> bool:
+    text_lower = text.lower()
+    return any(kw in text_lower for kw in BIRD_KEYWORDS)
 def chat_groq(msg, lang):
     msgs = [{"role": "system", "content": SYS[lang]}]
     for h in st.session_state.messages[-10:]:
@@ -679,9 +702,19 @@ Condor · Emu · PubMed · Gill 2020
             st.rerun()
 
     if user_input:
-        st.session_state.messages.append({"role":"user","content":user_input})
+    st.session_state.messages.append({"role":"user","content":user_input})
+
+    if not is_bird_question(user_input):
+        refusal = {
+            "العربية": "🦅 Ornis IA مخصص حصراً لعلم الطيور. سؤالك خارج نطاق تخصصي. أرجو طرح سؤال يتعلق بالطيور.",
+            "English": "🦅 Ornis IA is exclusively dedicated to ornithology. Your question is outside my scope. Please ask about birds.",
+            "Français": "🦅 Ornis IA est exclusivement dédié à l'ornithologie. Votre question dépasse mon domaine. Veuillez poser une question sur les oiseaux."
+        }
+        st.session_state.messages.append({"role":"model","content":refusal[lang]})
+    else:
         with st.spinner("🤔 Consulting ornithological literature..."):
             rep = chat_groq(user_input, lang)
         st.session_state.messages.append({"role":"model","content":rep})
-        save_current()
-        st.rerun()
+
+    save_current()
+    st.rerun()
