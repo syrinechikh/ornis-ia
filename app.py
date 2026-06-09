@@ -524,21 +524,21 @@ def delete_session(sid):
 # ═══════════════════════════════════════════════════════════════
 def chat_groq(msg, lang):
     msgs = [{"role": "system", "content": SYS[lang]}]
-    for h in st.session_state.messages[-6:]:
+    for h in st.session_state.messages[-3:]:
         msgs.append({
             "role": "assistant" if h["role"] == "model" else "user",
             "content": h["content"]
         })
     msgs.append({"role": "user", "content": msg})
+
     try:
         r = client.chat.completions.create(
-            model=CHAT_MODEL,
+            model="compound-beta",
             messages=msgs,
-            max_tokens=3000,
+            max_tokens=2000,
             temperature=0.05
         )
         response_text = r.choices[0].message.content or ""
-        # Add web sources if compound-beta returns them
         if hasattr(r, 'sources') and r.sources:
             sources_text = "<br><br><b>🌐 Web Sources:</b><br>"
             for s in r.sources[:3]:
@@ -548,7 +548,24 @@ def chat_groq(msg, lang):
                     sources_text += f"• <a href='{url}' target='_blank'>{title}</a><br>"
             response_text += sources_text
         return response_text
+
     except Exception as e:
+        if "413" in str(e) or "too_large" in str(e):
+            # fallback: نموذج أخف مع prompt مختصر
+            try:
+                short_sys = SYS[lang].split("═══")[0].strip()
+                r2 = client.chat.completions.create(
+                    model="llama-3.3-70b-versatile",
+                    messages=[
+                        {"role": "system", "content": short_sys},
+                        {"role": "user",   "content": msg}
+                    ],
+                    max_tokens=2000,
+                    temperature=0.05
+                )
+                return r2.choices[0].message.content or ""
+            except Exception as e2:
+                return f"⚠️ Error: {e2}"
         return f"⚠️ Error: {e}"
 
 def analyze_image(img_file, lang):
